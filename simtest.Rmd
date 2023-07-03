@@ -1,0 +1,35 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 3
+    number_sections: true
+title: Test output
+---
+
+```{r,echo=F}
+source("markdown_functions.R")
+```
+
+# Simulation overview
+
+The impact of PPD for each outcome was varied (as a fraction of its baseline value), for the fractions `r impactsToTest` 
+
+# Results
+
+The table below shows the fraction of 1000 simulations that had a "significant" model outcome at 0.05 for each of the configurations tested.
+
+```{r,echo=F}
+outputTable <- melt(comparisonTable, id.vars = "Outcome", variable.name = "Model", value.name = "Value",variable.factor=F)
+outputTable <- dcast(outputTable, Model ~ Outcome, value.var = "Value")
+outputTable[,ImpactAsFractionOfBaseline:=gsub("ImpactVar_(.*)_1000","\\1",Model)]
+outputTable[,Model:=NULL]
+names(outputTable) <- c("Rehab","Hospital","Reoffended","ImpactAsFractionOfBaseline")
+setcolorder(outputTable,c(4,1,2,3))
+setorder(outputTable,"ImpactAsFractionOfBaseline")
+
+kable(outputTable,"html") %>% 
+   kable_styling("basic")
+```

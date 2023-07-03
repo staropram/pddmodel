@@ -1,0 +1,295 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 3
+    number_sections: true
+title: PDD M2S1 Analysis - 5% variance in police force baselines
+---
+
+```{r,echo=F}
+source("markdown_functions.R")
+```
+
+# Parameterisation
+
+The intent of this section is to give an overview of the paremeterisation used in the simulation, for example what parameters varied, what remained fixed, and then to give a visual overview.
+
+# Base parameters
+
+## Police forces
+
+We use the "estimated" participation rate of ```r testConfig$police$mean_pdd_participants_per_force``` and expected PDD status of some real UK forces to generate data.
+
+```{r,echo=F}
+datatable(modelTestData$pf[,c("PoliceForceID","UsesPDD","Population","ParticipantCount","PersistentOffenderFraction")],options=list(ordering=F,dom="t"),rownames=F)
+```
+Offenders fall into two categories:
+
+1. Group 1: Low level offenders
+2. Group 2: Persistent offenders (typically drug dependent)
+
+In the above table we characterise this using the parameter ```PersistentOffenderFraction```.
+
+It can be observed that for police forces that do not implement PDD, this value is 0.5 as it assumed that these "control" forces have a 50/50 split of offender types. Police force PDD schemes usually target one or the other offender group. For this reason if a force targets Group 1, it is assumed that there ```PersistentOffenderFraction``` is 0 and if a force targets Group 2 it is assumed that their ```PersistentOffenderFraction``` is 1. Thus the above table captures both the semantics of whether a police force uses PDD and which offender group it targets.
+
+From the above we can derive the following information:
+
+```{r,echo=F}
+pfCategories <-  modelTestData$pf[,list(PoliceForces=paste(PoliceForceID,collapse=' ')),by="PersistentOffenderFraction"]
+pfCategories$PDDType <- "NONE"
+pfCategories[PersistentOffenderFraction==1]$PDDType <- "Group 2"
+pfCategories[PersistentOffenderFraction==0]$PDDType <- "Group 1"
+pfCategories[,N:=(sum(gregexpr(" ", PoliceForces)[[1]] > 0)+1),by="PDDType"]
+
+datatable(pfCategories[,c("PDDType","PoliceForces","N")],options=list(dom="t",ordering=F),rownames=F)
+```
+
+## Effects
+
+There are three outcome effects modelled at the participant level:
+
+1. `ReoffendedWithinYear` is a binary variable that indicates whether an individual reoffended within a year (1) or not (0).
+2. `EnteredDrugTreatment` is a binary variable that indicates whether an individual reoffended within a year (1) or not (0).
+3. `HospitalEventCount` is a count variable that indicates the number of hospitalisations each individual experienced within a year.
+
+We assume force level variation of the baseline event and a fixed effect of PDD. Furthermore the baseline rate of ```HospitalEventCount``` is different for Group 1 and Group 2 offenders. The parameters are as follows:
+
+```{r,echo=F}
+d <- rbind(
+	c(
+	  "ReoffendedWithinYear",
+	  paste(testConfig$effects$reoffending$baseline,"\u00B1 ",policeForceVariability,"%"),
+	  paste(testConfig$effects$reoffending$baseline,"\u00B1 ",policeForceVariability,"%"),
+	  -testConfig$effects$reoffending$pdd_impact_min,
+	  -testConfig$effects$reoffending$pdd_impact_min
+	),
+	c(
+	  "EnteredDrugTreatment",
+	  paste(testConfig$effects$rehab$baseline,"\u00B1 ",policeForceVariability,"%"),
+	  paste(testConfig$effects$rehab$baseline,"\u00B1 ",policeForceVariability,"%"),
+	  testConfig$effects$rehab$pdd_impact_min,
+	  testConfig$effects$rehab$pdd_impact_min
+	),
+	c(
+	  "HospitalEventCount",
+	  paste(format(testConfig$effects$hospitalisation$group1$baseline,digits=3),"\u00B1 ",policeForceVariability,"%"),
+	  paste(format(testConfig$effects$hospitalisation$group2$baseline,digits=3),"\u00B1 ",policeForceVariability,"%"),
+	  format(-testConfig$effects$hospitalisation$group1$pdd_impact_min,digits=3),
+	  format(-testConfig$effects$hospitalisation$group2$pdd_impact_min,digits=3)
+	)
+
+)
+kable(d) %>% add_header_above(c("Outcome" = 1, "Baseline G1" = 1, "Baseline G2" = 1, "Impact G1" = 1, "Impact G2" = 1),align="l") %>%
+	  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+At the present time the impact is identical for groups 1 and 2 for `ReoffendedWithinYear` and `EnteredDrugTreatment` outcomes.
+
+Variability is added to the baseline values per force from a normal distribution constructed so that the truncated 99.999% tails coincide with the \pm 5%, as specified in the table above.
+
+A given participant then receives an effect probability according to:
+
+$$
+\text{EffectProbability} = \text{ForceBaseline} + \text{UsesPDD} \times ((1-\text{IsPersistentOffender}) \times \text{ImpactG1} + \text{IsPersistentOffender} \times \text{ImpactG2})
+$$
+
+Where:
+
+$$\text{UsesPDD} \in \{0,1\}$$ 
+
+denotes the participants PDD status (inherited from force) and:
+
+$$\text{IsPersistentOffender} \in \{0,1\}$$
+
+denote the participant group status.
+
+# Simulation
+
+We generate `r config$sim$num_models_per_sim` random datasets and fit the following models.
+
+```{r,echo=F,warn=F}
+
+formulae <- data.table(do.call(rbind,config$sim$formulae))
+# give the formulae table names
+names(formulae) <- c("Name","ModelFunction","Formula","Family")
+formulae$Formula <- as.character(lapply(formulae$Formula,as.formula))
+datatable(formulae,rownames=F,options=list(ordering=F,dom="t"))
+```
+
+The model with `UsesPDD` as a predictor variable and a random intercept term `(1|PoliceForceID)` is a mixed-effects logistic regression model that examines the relationship between police diversion and the likelihood of reoffending within a year, while taking into account the variation in the baseline reoffending probability across different police forces. The response variables are defined as follows:
+
+1. `ReoffendedWithinYear` is a binary variable that indicates whether an individual reoffended within a year (1) or not (0). This outcome was generated using a binomial distribution and thus the "binomial" family is used in the regression.
+2. `EnteredDrugTreatment` is a binary variable that indicates whether an individual reoffended within a year (1) or not (0). This outcome was general using a binomial distribution and thus the "binomial" family is used in the regression.
+3. `HospitalEventCount` is a count variable that indicates the number of hospitalisations each individual experienced within a year. This outcome was generated using a negative binomial distribution and thus we use `glmmTMB` with the family "nbinom2". We use `glmmTMB` instead of `glmer.nb` because the latter uses maximum likelihood estimation and is over 10 times slower than the former.
+
+
+In this model, `randomDataset` is the dataset that contains the variables of interest (`ReoffendedWithinYear`, `UsesPDD`, and `PoliceForceID`). The `family` argument specifies that a binomial model should be used since the response variable is binary. The random intercept term `(1|PoliceForceID)` allows for variation in the baseline reoffending probability across different police forces.
+
+## Results Summary
+
+The table below shows the proportion of models out of 1000 that found the respective outcome significant at the 5% level.
+
+```{r,echo=F}
+datatable(comparisonTable,rownames=F,options=list(ordering=F,dom="t"))
+```
+
+```{r,echo=F}
+allForcesSignificance <- simOutputs$AllForces_10$significance
+allForcesModels <- simOutputs$AllForces_10$models
+first6Significance <- simOutputs$First6Forces_10$significance
+first6Models <- simOutputs$First6Forces_10$models
+```
+
+## Results AllForces {.tabset}
+
+### ReoffendedWithinYear {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(allForcesSignificance$ReoffendedWithinYear,0.05,config$sim$num_models_per_sim))
+
+hist(unlist(allForcesSignificance$ReoffendedWithinYear))
+
+summary(unlist(allForcesSignificance$ReoffendedWithinYear))
+```
+
+
+#### Most significant model
+```{r,echo=F}
+summary(allForcesModels$ReoffendedWithinYear[[which.min(allForcesSignificance$ReoffendedWithinYear)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(allForcesModels$ReoffendedWithinYear[[which.max(allForcesSignificance$ReoffendedWithinYear)]])
+```
+
+### EnteredDrugTreatment {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(allForcesSignificance$EnteredDrugTreatment,0.05,config$sim$num_models_per_sim))
+
+hist(unlist(allForcesSignificance$EnteredDrugTreatment))
+
+summary(unlist(allForcesSignificance$EnteredDrugTreatment))
+```
+
+#### Most significant model
+```{r,echo=F}
+summary(allForcesModels$EnteredDrugTreatment[[which.min(allForcesSignificance$EnteredDrugTreatment)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(allForcesModels$EnteredDrugTreatment[[which.max(allForcesSignificance$EnteredDrugTreatment)]])
+```
+
+### HospitalEventCount {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(allForcesSignificance$HospitalEventCount,0.05,config$sim_num_models_per_sim))
+
+hist(unlist(allForcesSignificance$HospitalEventCount))
+
+summary(unlist(allForcesSignificance$HospitalEventCount))
+```
+
+#### Most significant model
+```{r,echo=F}
+summary(allForcesModels$HospitalEventCount[[which.min(allForcesSignificance$HospitalEventCount)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(allForcesModels$HospitalEventCount[[which.max(allForcesSignificance$HospitalEventCount)]])
+```
+
+The assumptions are identical to the previous baseline model described but we only use the first 6 police forces: PF1 - PF6 
+
+## Results First6Forces {.tabset}
+
+### ReoffendedWithinYear {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(first6Significance$ReoffendedWithinYear,0.05,config$sim$num_models_per_sim))
+
+hist(unlist(first6Significance$ReoffendedWithinYear))
+
+summary(unlist(first6Significance$ReoffendedWithinYear))
+```
+
+#### Most significant model
+```{r,echo=F}
+summary(first6Models$ReoffendedWithinYear[[which.min(first6Significance$ReoffendedWithinYear)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(first6Models$ReoffendedWithinYear[[which.max(first6Significance$ReoffendedWithinYear)]])
+```
+
+### EnteredDrugTreatment {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(first6Significance$EnteredDrugTreatment,0.05,config$sim$num_models_per_sim))
+
+hist(unlist(first6Significance$EnteredDrugTreatment))
+
+summary(unlist(first6Significance$EnteredDrugTreatment))
+```
+
+#### Most significant model
+```{r,echo=F}
+summary(first6Models$EnteredDrugTreatment[[which.min(first6Significance$EnteredDrugTreatment)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(first6Models$EnteredDrugTreatment[[which.max(first6Significance$EnteredDrugTreatment)]])
+```
+
+### HospitalEventCount {-}
+
+#### Significance proportions
+
+The figure below shows the histogram of the UsesPDD fixed effect significance:
+
+```{r,echo=F}
+invisible(make_significance_pie(first6Significance$HospitalEventCount,0.05,config$sim$num_models_per_sim))
+
+hist(unlist(first6Significance$HospitalEventCount))
+
+summary(unlist(first6Significance$HospitalEventCount))
+```
+
+#### Most significant model
+```{r,echo=F}
+summary(first6Models$HospitalEventCount[[which.min(first6Significance$HospitalEventCount)]])
+```
+
+#### Least significant model
+```{r,echo=F}
+summary(first6Models$HospitalEventCount[[which.max(first6Significance$HospitalEventCount)]])
+```

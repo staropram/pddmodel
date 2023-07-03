@@ -1,0 +1,154 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 3
+    number_sections: true
+title: Varying differences between police forces
+---
+
+```{r,echo=F}
+source("markdown_functions.R")
+source("model_power_vs_police_force_variance.R")
+```
+
+# Simulation overview
+
+The baseline rates were varied between police forces to varying extents to see what impact this would have on model power for each of the outcomes.
+
+The simulation was characterised by the amount of variation applied as a percentage to some specified base rate for each outcome.
+
+The following variations were applied: `r policeForceVariabilities`
+
+# Results
+
+The table below shows the fraction of 1000 simulations that had a "significant" model outcome at 0.05 for each of the configurations tested.
+
+```{r,echo=F}
+if(F) {
+comparisonMelted <- melt(comparisonTable, id.vars = "Outcome", variable.name = "Model", value.name = "Value",variable.factor=F)
+comparisonMelted[,BetweenForceVariance:=gsub(".*_PV(.*)_1000","\\1",Model)]
+comparisonMelted2 <- dcast(comparisonMelted, Model ~ Outcome, value.var = "Value")
+names(comparisonMelted2) <- c("Model","Rehab","Hospital","Reoffend")
+# add in the "variability" as SDs
+comparisonMelted2[,RehabSD:=lapply(configList[Model],function(cfg) {cfg$effects$rehab$baseline_sd})]
+comparisonMelted2[,HospitalSDG1:=lapply(configList[Model],function(cfg) {cfg$effects$hospitalisation$group1$baseline_sd})]
+comparisonMelted2[,HospitalSDG2:=lapply(configList[Model],function(cfg) {cfg$effects$hospitalisation$group2$baseline_sd})]
+comparisonMelted2[,ReoffendSD:=lapply(configList[Model],function(cfg) {cfg$effects$reoffending$baseline_sd})]
+
+comparisonSeparated <- lapply(c("AllForces","First6","First12"),function(selection) {
+   d <- comparisonMelted2[str_detect(comparisonMelted2$Model,selection)]
+   d[,BetweenForceVariance:=gsub(".*_PV(.*)_1000","\\1",Model)]
+   d[,Model:=NULL]
+   setkey(d,"BetweenForceVariance")
+   setcolorder(d,c("BetweenForceVariance","Rehab","Hospital","Reoffend"))
+   names(d) <- c("BetweenForceVariance",paste(selection,c("Rehab","Hospital","Reoffend"),sep="_"))
+   d
+})
+
+outputTable <- Reduce(function(a,b) { merge(a,b,on="BetweenForceVariance") },comparisonSeparated)
+# order this so we group by force selection all,first12,first6
+setcolorder(outputTable,c(1,2,8,5,3,9,6,4,10,7))
+#names(outputTable) <- c("BetweenForceVariance",rep(c("All","First12","First6"),3))
+
+kable(outputTable,"html") %>% 
+   kable_styling("basic") %>% 
+   #column_spec(1, border_right = "solid") %>%
+   column_spec(1, extra_css = "border-right: solid 1px lightgrey;") %>%
+   column_spec(4, extra_css = "border-right: solid 1px lightgrey;") %>%
+   column_spec(7, extra_css = "border-right: solid 1px lightgrey;") %>%
+   column_spec(10, extra_css = "border-right: solid 1px lightgrey;") %>%
+   add_header_above(header=c(" "=1,"Rehab"=3,"Hospital"=3,"Reoffend"=3))
+}
+```
+
+## Reoffending
+
+```{r,echo=F,fig.width=8,fig.height=8}
+plot_reoffending_power_vs_pf_sd()
+
+# save it to PNG
+savedPlot <- recordPlot()
+png(filename = "figures/reoffending_vs_pf_original.png", width = 600, height = 600)
+replayPlot(savedPlot)
+invisible(dev.off())
+```
+
+## Entry into drug treatment
+
+```{r,echo=F,fig.width=8,fig.height=8}
+plot_rehab_power_vs_pf_sd()
+
+# save it to PNG
+savedPlot <- recordPlot()
+png(filename = "figures/rehab_vs_pf_original.png", width = 600, height = 600)
+replayPlot(savedPlot)
+invisible(dev.off())
+```
+
+## Hospitalisation
+
+### Both groups
+
+```{r,echo=F,fig.width=8,fig.height=8}
+plot_hosp_power_vs_pf_sd()
+# save it to PNG
+savedPlot <- recordPlot()
+png(filename = "figures/hospital_vs_pf_original_both.png", width = 600, height = 600)
+replayPlot(savedPlot)
+invisible(dev.off())
+```
+
+### Group 1 (Casual offenders)
+
+```{r,echo=F,fig.width=8,fig.height=8}
+plot_hosp_power_vs_pf_sd_g1()
+# save it to PNG
+savedPlot <- recordPlot()
+png(filename = "figures/hospital_vs_pf_original_g1.png", width = 600, height = 600)
+replayPlot(savedPlot)
+invisible(dev.off())
+```
+
+### Group 2 (Persistent offenders)
+
+```{r,echo=F,fig.width=8,fig.height=8}
+plot_hosp_power_vs_pf_sd_g2()
+# save it to PNG
+savedPlot <- recordPlot()
+png(filename = "figures/hospital_vs_pf_original_g2.png", width = 600, height = 600)
+replayPlot(savedPlot)
+invisible(dev.off())
+```
+
+### PF data
+
+#### All forces
+
+```{r,echo=F}
+kable(modelTestData$pf) %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F,position = "center")
+```
+
+#### First 12
+
+```{r,echo=F}
+kable(modelTestData$pf[1:12]) %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F,position = "center")
+```
+
+#### First 6
+
+```{r,echo=F}
+kable(modelTestData$pf[1:6]) %>% kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),full_width = F,position = "center")
+```
+
+#### Summaries
+
+```{r,echo=T}
+summary(modelTestData$pf)
+
+summary(modelTestData$pf[1:12])
+
+summary(modelTestData$pf[1:6])
+```

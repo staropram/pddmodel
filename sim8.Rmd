@@ -1,0 +1,22 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: false
+    toc_depth: 3
+    number_sections: true
+title: PDD A&E power differential estimate
+---
+
+```{r,echo=F}
+source("markdown_functions.R")
+library(DT)
+```
+
+# Parameterisation
+
+```{r,echo=F}
+d <- hospital_diff[,c("Baseline","ImpactMultiplier","All","F6","Diff")]
+datatable(d,rownames=F,options=list(pageLength=15))# %>% kable_styling(bootstrap_options = c("striped", "hover"))
+```

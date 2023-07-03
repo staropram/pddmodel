@@ -1,0 +1,387 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\hypersetup{
+  pdftitle={Police Diversion \& Drugs (PDD) Model Simulation - Interim report},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+\urlstyle{same} % disable monospaced font for URLs
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable,booktabs}
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{5}
+\usepackage{booktabs}
+\PassOptionsToPackage{table}{xcolor}
+\usepackage{colortbl}
+\definecolor{pastelred}{rgb}{1.0, 0.5, 0.5}
+\definecolor{pastelgreen}{rgb}{0.6, 1.0, 0.6}
+\usepackage{float}
+
+\title{Police Diversion \& Drugs (PDD) Model Simulation - Interim report}
+\usepackage{etoolbox}
+\makeatletter
+\providecommand{\subtitle}[1]{% add subtitle to \maketitle
+  \apptocmd{\@title}{\par {\large #1 \par}}{}{}
+}
+\makeatother
+\subtitle{Ashley Mills, Dan Lewer, Jack Cunliffe}
+\author{}
+\date{\vspace{-2.5em}}
+
+\begin{document}
+\maketitle
+
+{
+\setcounter{tocdepth}{2}
+\tableofcontents
+}
+\hypertarget{summary}{%
+\section{Summary}\label{summary}}
+
+A statistical model was created to assess the power of three primary outcomes for Police Diversion \& Drugs (PDD) intervention: Reoffending rate, Drug treatment rate, and hospitalisation count. Simulations revealed good power for drug treatment as an outcome which was relatively robust to between-force variance, good to moderate power for reoffending rate but with sensitivity to between-force variance, and poor power for hospitalisation count. It is recommended that baseline reoffending rates be estimated for police forces to improve statistical power of the cohort study and introduce the possibility of using a weighted reoffending statistic. A more eventful hospital outcome should be explored as a secondary outcome to increase the power of this outcome.
+
+\hypertarget{introduction}{%
+\section{Introduction}\label{introduction}}
+
+A comparative study between police forces that do or do not implement some form of Police Diversion \& Drugs (PDD) scheme has been suject to simulation for the purpose of exploratory analysis. The primary outcomes simulated are:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Reoffending rate - A participant either reoffends within a year of PDD or does not.
+\item
+  Treatment rate - A participant either enters into drug treatment within a year of PDD or not.
+\item
+  Hospitalisation count - A participant can be hopsitalised for a drug related incident zero or more times within a year of PDD.
+\end{enumerate}
+
+Reoffending and treatment rates are simulated as binomial distributions and hospitalisation is simulated as a negative binomial distribution, this provides between-individual variance.
+
+These distributions are parameterised on a per-force basis so that between-force variance can be introduced through the baseline rates.
+
+A given random instantiation randomises both force data and individual level data per force.
+
+By averaging over 1000 such instances, and fitting models for each instance and outcome, an estimate of the power of each outcome given the assumptions can be made. This document outlines the findings from this process.
+
+\hypertarget{parameterisation}{%
+\section{Parameterisation}\label{parameterisation}}
+
+\hypertarget{police-forces}{%
+\subsection{Police forces}\label{police-forces}}
+
+We assume a mean per-force participation count of \texttt{500} and then derive a specific per-force participation rate by distributing this mean according each force's population. Expected PDD status is obtained from current knowledge of UK police force participation for the project. Table \ref{tab:policeForces} below shows the force data that remains constant between simulation runs. In practice a given random instance will contain columns for baseline outcome rates that vary between instantiations.
+
+\begin{table}[H]
+
+\caption{\label{tab:policeForces}Fixed police force data used in the simulation runs}
+\centering
+\begin{tabular}[t]{llrrr}
+\toprule
+PoliceForceID & UsesPDD & Population & ParticipantCount & PersistentOffenderFraction\\
+\midrule
+PF1 & \cellcolor{pastelgreen}{TRUE} & 527000 & 193 & 1.0\\
+PF2 & \cellcolor{pastelgreen}{TRUE} & 2145000 & 787 & 0.0\\
+PF3 & \cellcolor{pastelgreen}{TRUE} & 2930000 & 1075 & 0.0\\
+PF4 & \cellcolor{pastelred}{FALSE} & 2820000 & 1035 & 0.5\\
+PF5 & \cellcolor{pastelred}{FALSE} & 1376000 & 505 & 0.5\\
+\addlinespace
+PF6 & \cellcolor{pastelred}{FALSE} & 1140200 & 418 & 0.5\\
+PF7 & \cellcolor{pastelgreen}{TRUE} & 1720000 & 631 & 0.0\\
+PF8 & \cellcolor{pastelgreen}{TRUE} & 675700 & 248 & 0.0\\
+PF9 & \cellcolor{pastelred}{FALSE} & 1423065 & 522 & 0.5\\
+PF10 & \cellcolor{pastelred}{FALSE} & 1790000 & 657 & 0.5\\
+\addlinespace
+PF11 & \cellcolor{pastelgreen}{TRUE} & 1434000 & 526 & 0.0\\
+PF12 & \cellcolor{pastelgreen}{TRUE} & 1668000 & 612 & 0.0\\
+PF13 & \cellcolor{pastelred}{FALSE} & 1190000 & 437 & 0.5\\
+PF14 & \cellcolor{pastelgreen}{TRUE} & 353300 & 130 & 0.0\\
+PF15 & \cellcolor{pastelgreen}{TRUE} & 1190000 & 437 & 0.0\\
+\addlinespace
+PF16 & \cellcolor{pastelgreen}{TRUE} & 856000 & 314 & 0.0\\
+PF17 & \cellcolor{pastelgreen}{TRUE} & 569000 & 209 & 1.0\\
+PF18 & \cellcolor{pastelred}{FALSE} & 723000 & 265 & 0.5\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Offenders fall into two categories:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Group 1: Low level offenders
+\item
+  Group 2: Persistent offenders (typically drug dependent)
+\end{enumerate}
+
+In the above table we characterise this using the parameter \texttt{PersistentOffenderFraction}.
+
+It can be observed that for police forces that do not implement PDD, this value is 0.5 as it assumed that these ``control'' forces have a 50/50 split of offender types. Police force PDD schemes usually target one or the other offender group. For this reason if a force targets Group 1, it is assumed that there \texttt{PersistentOffenderFraction} is 0 and if a force targets Group 2 it is assumed that their \texttt{PersistentOffenderFraction} is 1. Thus the above table captures both the semantics of whether a police force uses PDD and which offender group it targets. The summarised information is shown in Table \ref{tab:pddSummary}
+
+\begin{table}[H]
+
+\caption{\label{tab:pddSummary}Summary of police force inclusion in PDD}
+\centering
+\begin{tabular}[t]{llr}
+\toprule
+PDDType & PoliceForces & N\\
+\midrule
+Group 2 & PF1 PF17 & 2\\
+Group 1 & PF2 PF3 PF7 PF8 PF11 PF12 PF14 PF15 PF16 & 9\\
+NONE & PF4 PF5 PF6 PF9 PF10 PF13 PF18 & 7\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Between force variation of baseline outcome rates are drawn from a normal distribution with a specified standard deviation. This parameter can be changed and is done so in the analysis section below.
+
+\hypertarget{participant-level-outcomes}{%
+\subsection{Participant level Outcomes}\label{participant-level-outcomes}}
+
+\hypertarget{reoffending-rate}{%
+\subsubsection{Reoffending rate}\label{reoffending-rate}}
+
+\texttt{ReoffendedWithinYear} is a binary variable that indicates whether an individual reoffended within a year (1) or not (0). It is modeled as a binomial distribution with mean reoffending rate equal to the baseline specified below with variation around this mean between forces having a standard deviation of 1 percentage point (for illustration). The parameters are shown in Table \ref{tab:reoffending}:
+
+\begin{table}[H]
+
+\caption{\label{tab:reoffending}Baseline, between force variability (SD Baseline), and impact for ReoffendedWithinYear outcome}
+\centering
+\begin{tabular}[t]{llll}
+\toprule
+\multicolumn{1}{l}{Outcome} & \multicolumn{1}{l}{Baseline} & \multicolumn{1}{l}{SD Baseline} & \multicolumn{1}{l}{Impact} \\
+\cmidrule(l{3pt}r{3pt}){1-1} \cmidrule(l{3pt}r{3pt}){2-2} \cmidrule(l{3pt}r{3pt}){3-3} \cmidrule(l{3pt}r{3pt}){4-4}
+ReoffendedWithinYear & 25 \% & 1 \% & -3 \%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+It is assumed that PDD has the effect of reducing the reoffending rate by 3 percentage points.
+
+\hypertarget{drug-treatment-rate}{%
+\subsubsection{Drug treatment rate}\label{drug-treatment-rate}}
+
+\texttt{EnteredDrugTreatment} is a binary variable that indicates whether an individual entered into drug treatment within a year (1) or not (0). It is modeled as a binomial distribution with mean reoffending rate equal to the baseline specified below with variation around this mean between forces having a standard deviation of 1 percentage point (for illustration). The parameters are shown in Table \ref{tab:rehab}:
+
+\begin{table}[H]
+
+\caption{\label{tab:rehab}Baseline, between-force variability (SD Baseline), and impact for EnteredDrugTreatment outcome}
+\centering
+\begin{tabular}[t]{llll}
+\toprule
+\multicolumn{1}{l}{Outcome} & \multicolumn{1}{l}{Baseline} & \multicolumn{1}{l}{SD Baseline} & \multicolumn{1}{l}{Impact} \\
+\cmidrule(l{3pt}r{3pt}){1-1} \cmidrule(l{3pt}r{3pt}){2-2} \cmidrule(l{3pt}r{3pt}){3-3} \cmidrule(l{3pt}r{3pt}){4-4}
+EnteredDrugTreatment & 10 \% & 1 \% & 5 \%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+It is assumed that PDD has the effect of increasing the entry into drug treatment by 5 percentage points.
+
+\hypertarget{hospital-event-count}{%
+\subsubsection{Hospital event count}\label{hospital-event-count}}
+
+\texttt{HospitalEventCount} is a count variable that indicates the number of hospitalisations each individual experienced within a year of PDD intervention. It is modeled as a negative binomial distribution with different mean rates and dispersions for Group 1 and Group 2 offenders.
+
+We assume force level variation of the baseline event and a fixed effect of PDD. Furthermore the baseline rate of \texttt{HospitalEventCount} is different for Group 1 and Group 2 offenders. The parameters are shown in Table \ref{tab:hospEventCount}:
+
+\begin{table}[H]
+
+\caption{\label{tab:hospEventCount}Baseline, between-force variability (SD Baseline), and impact for HospitalEventCount outcome}
+\centering
+\begin{tabular}[t]{llll}
+\toprule
+\multicolumn{1}{l}{Outcome} & \multicolumn{1}{l}{Baseline} & \multicolumn{1}{l}{SD Baseline} & \multicolumn{1}{l}{Impact} \\
+\cmidrule(l{3pt}r{3pt}){1-1} \cmidrule(l{3pt}r{3pt}){2-2} \cmidrule(l{3pt}r{3pt}){3-3} \cmidrule(l{3pt}r{3pt}){4-4}
+HospitalEventCount - Group 1 & 0.0248 & 5\% of baseline & -0.00248\\
+HospitalEventCount - Group 2 & 0.123 & 5\% of baseline & -0.0184\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The impacts listed for HospitalEventCount are numerical count rates and correspond to 10\% of the baseline rate for group 1 and 15\% for group 2. Note that at the present time the impact for the outcomes \texttt{ReoffendedWithinYear} and \texttt{EnteredDrugTreatment} are assumed to be identical for groups 1 and 2.
+
+\hypertarget{models}{%
+\subsection{Models}\label{models}}
+
+The models for each of the outcomes are summarised in Table \ref{tab:models}.
+
+\begin{table}[H]
+
+\caption{\label{tab:models}Model formulae for each outcome}
+\centering
+\begin{tabular}[t]{ll>{\raggedright\arraybackslash}p{6.5cm}l}
+\toprule
+Name & ModelFunction & Formula & Family\\
+\midrule
+ReoffendedWithinYear & glmer & ReoffendedWithinYear \textasciitilde{} UsesPDD + PersistentOffender + (1 | PoliceForceID) & binomial\\
+EnteredDrugTreatment & glmer & EnteredDrugTreatment \textasciitilde{} UsesPDD + PersistentOffender + (1 | PoliceForceID) & binomial\\
+HospitalEventCount & glmmTMB & HospitalEventCount \textasciitilde{} UsesPDD + PersistentOffender + (1 | PoliceForceID) & nbinom2\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\texttt{ModelFunction} indicates the model fitting function in R used to fit the model. The \texttt{Formula} indicates the relationship between the outcome and the explanatory variables used to fit the model, and the \texttt{Family} indicates the nature of the response variable and allows non-linear outcomes to be linearly modeled.
+
+Each Formula for the different outcomes follows the same pattern: the model fits the outcome as a function of the fixed effects \texttt{UsesPDD} and \texttt{PersistentOffender} capturing whether an individual was enrolled in police diversion and drugs, and whether they are a persistent offender respectively. The term \texttt{(1\ \textbar{}\ PoliceForceID)} asks the model to fit a random intercept for each police force to try and account for between-force variance of the baseline effect.
+
+\hypertarget{impact-of-between-force-variance-on-model-power}{%
+\section{Impact of between force variance on model power}\label{impact-of-between-force-variance-on-model-power}}
+
+Given the above assumptions it is useful to examine how changing the between-force variance with respect to outcome baseline values, effects the model power.
+
+To that end, for each of the outcomes, the between-force standard deviation was gradually increased. For each level of variability the outcome power was estimated by creating 1000 random data instantiations and the percentage of instantiations detecting a significant effect recorded as the power estimate.
+
+The set of police forces included in the model were also varied simultaneously to examine sensitivity to force participation. Three police force participation sets were considered: all 18 forces, the first 12 forces, and the first 6 forces (with respect to Table \ref{tab:policeForces} )
+
+\hypertarget{reoffending}{%
+\subsection{Reoffending}\label{reoffending}}
+
+Figure \ref{fig:reoffendPower} shows the change in model power as between force variance increases for the hospital event outcome.
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.8\linewidth]{figures/reoffending_vs_pf_original} 
+
+}
+
+\caption{Reoffending rate power as between-force variance increases.}\label{fig:reoffendPower}
+\end{figure}
+
+Reoffending power starts off around 80\% and then declines rapidly as between force SD increases. This indicates it would be valuable to have baseline measurements for reoffending rates to adjust for between-force variance.
+
+It should be possible to increase the power of the reoffending outcome by using a weighted reoffending measure such as one which considers crime severity as a linear scale may have more discernability than a count variable.
+
+The model is sensitive to the number of forces included in its construction so the aim should be to include as many forces as possible.
+
+\hypertarget{entry-into-drug-treatment}{%
+\subsection{Entry into drug treatment}\label{entry-into-drug-treatment}}
+
+Figure \ref{fig:rehabPower} shows the change in model power as between force variance increases for the hospital event outcome. The x-axis shows the Group 2 baseline variance.
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.8\linewidth]{figures/rehab_vs_pf_original} 
+
+}
+
+\caption{Entry into drug treatment power as between-force variance increases.}\label{fig:rehabPower}
+\end{figure}
+
+Entry into drug treatment is relatively robust to changes in between-force variance and is the most powerful outcome.
+
+\hypertarget{hospitalisation}{%
+\subsection{Hospitalisation}\label{hospitalisation}}
+
+Figure \ref{fig:hospPower} shows the change in model power as between force variance increases for the hospital event outcome.
+
+This assumes that PDD has an impact on both group 1 and group 2 hospitalisation rates.
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.8\linewidth]{figures/hospital_vs_pf_original_g2} 
+
+}
+
+\caption{Hospital event count power as between-force variance increases (for G2 impact equal to 15\% of the baseline rate, G2 impact equal to 10\% of baseline rate).}\label{fig:hospPower}
+\end{figure}
+
+This illustrates that the hospital event count is extremely underpowered having a power of only 20\% in the best scenario. The curve for ``First 6 forces'' actually shows an increase in Type 1 errors as the between-force variance increases since the first 6 forces are by chance dominated by forces with high persistent offender fractions.
+
+By doubling the assumed impact from 10\% of the baseline to 20\% of the baseline we can re-examine the relationship between the variables.
+
+Figure \ref{fig:hospPower2X} shows the change in model power as between force variance increases for the hospital event outcome, after doubling the assumed impact from 10\% of the baseline rate to 20\% of the baseline rate .
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.8\linewidth]{figures/hospital_vs_pf_2x_g2} 
+
+}
+
+\caption{Hospital event count power as between-force variance increases (for G2 impact equal to 30\% of the baseline rate, G1 impact equal to 20\% of the baseline rate.).}\label{fig:hospPower2X}
+\end{figure}
+
+Even with impact at 30\% of the baseline value, the hospital event outcome is still under-powered owing to the very small event likelihood.
+
+Finally we can ask the question, how (under) powered is the hospital event rate if PDD only impacts group 2, the persistent offenders.
+
+Figure \ref{fig:hospPowerNoGroup1} answers this question by assuming the group 2 impact is 15\% of the baseline rate and the group 1 impact is 0 \% of the baseline rate.
+
+\begin{figure}
+
+{\centering \includegraphics[width=0.8\linewidth]{figures/hospital_vs_pf_nogroup1_g2} 
+
+}
+
+\caption{Hospital event count power as between-force variance increases (for G2 impact equal to 15\% of the baseline rate, and G1 impact equal to 0).}\label{fig:hospPowerNoGroup1}
+\end{figure}
+
+The statistical power is extremely poor, and we again observe the Type 1 error rate increase for ``First 6 forces'' as between-force variance increases.
+
+It would be wise to investigate possible hopsital related outcomes that are more eventful, such as A\&E statistics, and which are likely to have more statistical power.
+
+\hypertarget{conclusion}{%
+\section{Conclusion}\label{conclusion}}
+
+After developing a statistical model to evaluate the potency of Police Diversion \& Drugs (PDD) schemes based on three key results - Reoffending rate, Drug treatment rate, and count of hospitalisations - the simulation tests offered insightful findings. The strength of drug treatment as an outcome was quite pronounced and largely unaffected by variations between different police forces. The power associated with the reoffending rate ranged from moderate to high, however, it showed susceptibility to inter-force differences. On the other hand, the power for the count of hospitalisations was found to be unsatisfactory. To enhance the effectiveness of the cohort study and to consider the use of a weighted statistic for reoffending, it is suggested to estimate baseline reoffending rates for individual police forces from available data. Furthermore, to augment the power of this outcome, the possibility of including a more event-driven hospital outcome as a secondary result should be considered.
+
+\end{document}
